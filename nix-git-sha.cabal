@@ -22,11 +22,21 @@ library
   hs-source-dirs:      src
 
   exposed-modules:     Nix.Base32
+                       Nix.Git
+                       Nix.Nar
 
-  -- other-modules:
+  other-modules:       Nix.Git.Internal
+
   -- other-extensions:
   build-depends:       base                             >= 4.12             && < 5
+                     , attoparsec
                      , base16-bytestring
                      , base32-z-bytestring
                      , bytestring
                      , containers
+                     , directory
+                     , filepath
+                     , process-extras
+                     , quiet
+                     , transformers
+                     , transformers-except
