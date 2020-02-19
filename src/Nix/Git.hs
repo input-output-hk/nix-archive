@@ -1,7 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Nix.Git where
+module Nix.Git
+  ( GitError (..)
+  , GitHash (..)
+  , GitObject (..)
+  , gitAssertDir
+  , gitCatFile
+  , gitListHash
+  ) where
 
 import           Control.Applicative ((<*))
 import           Control.Monad (unless)
@@ -41,14 +48,27 @@ data GitObject = GitObject
   } deriving (Eq, Generic)
     deriving (Read, Show) via (Quiet GitObject)
 
-gitListObjects :: GitHash -> ExceptT GitError IO [GitObject]
-gitListObjects (GitHash hash) = do
+gitAssertDir :: ExceptT GitError IO ()
+gitAssertDir = do
   exists <- liftIO $ doesDirectoryExist ".git"
   unless exists $
     left GEGitDirMissing
+  pure ()
+
+gitCatFile :: GitHash -> ExceptT GitError IO ByteString
+gitCatFile (GitHash hash) = do
+  gitAssertDir
+  liftIO $ gitProcess [ "cat-file", "-p", BS.unpack hash ]
+
+gitListHash :: GitHash -> ExceptT GitError IO [GitObject]
+gitListHash (GitHash hash) = do
+  gitAssertDir
   bs <- liftIO $ gitProcess [ "ls-tree", "--full-tree", "-r", BS.unpack hash ]
+  -- 'ls-tree' seems to return file objects sorted by their names, and that seems to
+  -- be what is needed for nar files.
   hoistEither $ first GEParsError (Atto.parseOnly lsParser bs)
 
+-- -------------------------------------------------------------------------------------------------
 
 lsParser :: Parser [GitObject]
 lsParser =
