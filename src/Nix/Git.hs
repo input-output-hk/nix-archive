@@ -8,6 +8,7 @@ module Nix.Git
   , gitAssertDir
   , gitCatFile
   , gitListHash
+  , renderGitError
   ) where
 
 import           Control.Applicative ((<*))
@@ -22,6 +23,8 @@ import           Data.Bifunctor (first)
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Char as Char
+import           Data.Text (Text)
+import qualified Data.Text as Text
 
 import           GHC.Generics (Generic)
 
@@ -37,6 +40,7 @@ data GitError
   deriving (Eq, Show)
 
 newtype GitHash
+  -- A git hash, but can also be the string "HEAD"
   = GitHash { unGitHash :: ByteString }
   deriving (Eq, Generic)
   deriving (Read, Show) via (Quiet GitHash)
@@ -56,17 +60,21 @@ gitAssertDir = do
   pure ()
 
 gitCatFile :: GitHash -> ExceptT GitError IO ByteString
-gitCatFile (GitHash hash) = do
-  gitAssertDir
+gitCatFile (GitHash hash) =
   liftIO $ gitProcess [ "cat-file", "-p", BS.unpack hash ]
 
 gitListHash :: GitHash -> ExceptT GitError IO [GitObject]
 gitListHash (GitHash hash) = do
-  gitAssertDir
   bs <- liftIO $ gitProcess [ "ls-tree", "--full-tree", "-r", BS.unpack hash ]
   -- 'ls-tree' seems to return file objects sorted by their names, and that seems to
   -- be what is needed for nar files.
   hoistEither $ first GEParsError (Atto.parseOnly lsParser bs)
+
+renderGitError :: GitError -> Text
+renderGitError ge =
+  case ge of
+    GEGitDirMissing -> "Provided directory does not contain a .git subdirectory."
+    GEParsError err -> mconcat [ "Git parse error: ", Text.pack err ]
 
 -- -------------------------------------------------------------------------------------------------
 
