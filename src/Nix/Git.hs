@@ -7,6 +7,7 @@ module Nix.Git
   , GitObject (..)
   , gitAssertDir
   , gitCatFile
+  , gitHeadHash
   , gitListHash
   , renderGitError
   ) where
@@ -62,6 +63,12 @@ gitAssertDir = do
 gitCatFile :: GitHash -> ExceptT GitError IO ByteString
 gitCatFile (GitHash hash) =
   liftIO $ gitProcess [ "cat-file", "-p", BS.unpack hash ]
+
+gitHeadHash :: ExceptT GitError IO GitHash
+gitHeadHash =
+  GitHash
+    . BS.takeWhile (Char.isHexDigit)
+    <$> liftIO (gitProcess [ "rev-parse", "HEAD" ])
 
 gitListHash :: GitHash -> ExceptT GitError IO [GitObject]
 gitListHash (GitHash hash) = do

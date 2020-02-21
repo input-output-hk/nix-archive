@@ -11,13 +11,14 @@ import           Control.Monad.Trans.Except.Extra (left, firstExceptT, newExcept
 import qualified Data.Binary.Put as Binary
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.Char as Char
 import           Data.Text (Text)
 import qualified Data.Text as Text
 
 import           Nix.Git
 import           Nix.Nar.Object
 
-import           System.Directory (doesDirectoryExist, setCurrentDirectory)
+import           System.Directory (doesDirectoryExist, setCurrentDirectory, withCurrentDirectory)
 import           System.FilePath (takeFileName)
 import           System.IO (Handle, IOMode (..), withFile)
 
@@ -46,11 +47,12 @@ renderNarStatus ns =
 -- -------------------------------------------------------------------------------------------------
 
 archiveExcept :: FilePath -> GitHash -> ExceptT NarStatus IO FilePath
-archiveExcept dir ghash = do
+archiveExcept dir gHashOrig = do
   isDir <- liftIO $ doesDirectoryExist dir
   unless isDir $
     left $ NarNotDir dir
-  let fpath = takeFileName dir ++ BS.unpack (unGitHash ghash) ++ ".nar"
+  ghash <- gitCheckHash dir gHashOrig
+  let fpath = takeFileName dir ++ "-" ++ BS.unpack (unGitHash ghash) ++ ".nar"
   newExceptT .
     withFile fpath WriteMode $ \ handle -> do
       setCurrentDirectory dir
@@ -58,7 +60,7 @@ archiveExcept dir ghash = do
         firstExceptT NarGitError gitAssertDir
         objs <- firstExceptT NarGitError (gitListHash ghash)
         let nobjs = gitToNarObjects objs
-        unless True .
+        unless False .
           -- Debug
           liftIO $ do
             putStrLn ""
@@ -66,6 +68,16 @@ archiveExcept dir ghash = do
             putStrLn ""
         writeNarTopLevel handle nobjs
   pure fpath
+
+gitCheckHash :: FilePath -> GitHash -> ExceptT NarStatus IO GitHash
+gitCheckHash dir ghash =
+  if BS.all Char.isHexDigit (unGitHash ghash)
+    then pure ghash
+    else newExceptT .
+           withCurrentDirectory dir .
+             runExceptT $
+               firstExceptT NarGitError gitHeadHash
+
 
 writeNarTopLevel :: Handle -> [NarObject] -> ExceptT NarStatus IO ()
 writeNarTopLevel h objs = do
@@ -81,13 +93,13 @@ writeNarTopLevel h objs = do
 writeNarObject :: Handle -> NarObject -> ExceptT NarStatus IO ()
 writeNarObject h obj = do
   case obj of
-    NarFile name _ghash -> writeNarFile h name
+    NarFile name ghash -> writeNarFile h name ghash
     NarDir name objs -> writeNarDir h name objs
 
 
-writeNarFile :: Handle -> FilePath -> ExceptT NarStatus IO ()
-writeNarFile h fpath = do
-  bs <- readFileBS fpath
+writeNarFile :: Handle -> FilePath -> GitHash -> ExceptT NarStatus IO ()
+writeNarFile h fpath ghash = do
+  bs <- firstExceptT NarGitError $ gitCatFile ghash
   mapM_ (liftIO . BS.hPutStr h) $
     [ narString "entry"
     , narString "("
@@ -148,3 +160,29 @@ narString bs =
 encodeLen :: Int -> BS.ByteString
 encodeLen len =
    LBS.toStrict . Binary.runPut $ Binary.putWord64le (fromIntegral len)
+
+
+
+wibble :: [NarObject]
+wibble =
+            [ NarFile
+                "Binary.hs" (GitHash "ead7c065706adbe2da41391e10d504409c8ae743")
+            , NarDir
+                "Binary"
+                [ NarFile
+                    "Annotated.hs" (GitHash "0a022f00f1d2aa809272fb4b7926a4262a85e8ed")
+                , NarFile
+                    "Deserialize.hs"
+                    (GitHash "bb6566682589a02ef281db99a696d6b0cf5c7878")
+                , NarFile
+                    "Drop.hs" (GitHash "44b292fac755144e828abdc65bc6cfbd8b9af75b")
+                , NarFile
+                    "FromCBOR.hs" (GitHash "c0c4e0d697a859a8f517fa915dd196d458b18969")
+                , NarFile
+                    "Raw.hs" (GitHash "69f430649a8db4064ffa735102aeacf559e3ec89")
+                , NarFile
+                    "Serialize.hs" (GitHash "92444be34b7b03e65bd35e54921ab797cf770891")
+                , NarFile
+                    "ToCBOR.hs" (GitHash "38a20582938535f8867f59048972134b6f709366")
+                ]
+            ]

@@ -4,12 +4,13 @@ module Nix.Nar.Object
   , printNarObjects
   ) where
 
+import qualified Data.List as List
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 
 import           Nix.Git
 
-import           System.FilePath (dropTrailingPathSeparator, splitPath)
+import           System.FilePath (dropTrailingPathSeparator, splitPath, takeFileName)
 
 import           Text.Show.Pretty (pPrint)
 
@@ -18,14 +19,30 @@ import           Text.Show.Pretty (pPrint)
 -- It seems symlinks are not represented, but instead uses the dereferenced version of
 -- the file.
 data NarObject
-  = NarFile FilePath GitHash
-  | NarDir FilePath [NarObject]
+  = NarDir FilePath [NarObject]
+  | NarFile FilePath GitHash
   deriving (Eq, Read, Show)
+
+-- Need a custom Ord instance to get the sort order the same as 'nix-store'.
+-- All compares that are already correct can just be 'EQ'.
+instance Ord NarObject where
+  compare a b =
+    case (a, b) of
+      (NarDir afp _, NarDir bfp _) -> compare afp bfp
+      (NarFile afp _, NarFile bfp _) -> compare afp bfp
+
+      (NarFile afp _, NarDir bfp _) -> compare afp bfp
+
+      -- (NarDir "Binary" _, NarFile bfp _) -> error $ "Ord NarObject:\n" ++ show ("Binary", takeFileName bfp)
+
+      (NarDir afp _, NarFile bfp _) -> compare afp bfp
+
+
 
 -- Convert a flat list of GitObject into a nested tree of NarObject.
 gitToNarObjects :: [GitObject] -> [NarObject]
 gitToNarObjects =
-  buildTree . groupOnHeadDir . map (dirAnnotate 0)
+  reorder . buildTree . groupOnHeadDir . map (dirAnnotate 0)
 
 -- Useful for debugging.
 printNarObjects :: [NarObject] -> IO ()
@@ -66,5 +83,15 @@ headMaybe xs =
     (x:_) -> Just x
 
 narFile :: GitObject -> NarObject
-narFile obj = NarFile (goName obj) (goHash obj)
+narFile obj = NarFile (takeFileName $ goName obj) (goHash obj)
 
+-- Recursively sort the tree to match the 'nix-store' version.
+reorder :: [NarObject] -> [NarObject]
+reorder =
+    List.sort . map reorderObj
+  where
+    reorderObj :: NarObject -> NarObject
+    reorderObj no =
+      case no of
+        NarDir fp objs -> NarDir fp (reorder objs)
+        NarFile {} -> no

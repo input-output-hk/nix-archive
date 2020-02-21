@@ -1,4 +1,4 @@
-module Nix.Base32
+module Nix.Nar.Base32
   ( Sha256 (..)
   , encode
   ) where
