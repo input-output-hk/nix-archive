@@ -17,6 +17,10 @@ copyright:           (c) 2020 IOHK
 -- category:
 extra-source-files:  CHANGELOG.md
 
+source-repository head
+  type:     git
+  location: https://github.com/input-output-hk/nix-archive
+
 library
   default-language:    Haskell2010
   ghc-options:         -Wall
