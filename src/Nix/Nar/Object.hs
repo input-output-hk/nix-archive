@@ -4,6 +4,7 @@ module Nix.Nar.Object
   , printNarObjects
   ) where
 
+import           Data.Bits ((.&.))
 import qualified Data.List as List
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -20,7 +21,7 @@ import           Text.Show.Pretty (pPrint)
 -- the file.
 data NarObject
   = NarDir FilePath [NarObject]
-  | NarFile FilePath GitHash
+  | NarFile FilePath GitHash Bool
   deriving (Eq, Read, Show)
 
 -- Need a custom Ord instance to get the sort order the same as 'nix-store'.
@@ -29,15 +30,9 @@ instance Ord NarObject where
   compare a b =
     case (a, b) of
       (NarDir afp _, NarDir bfp _) -> compare afp bfp
-      (NarFile afp _, NarFile bfp _) -> compare afp bfp
-
-      (NarFile afp _, NarDir bfp _) -> compare afp bfp
-
-      -- (NarDir "Binary" _, NarFile bfp _) -> error $ "Ord NarObject:\n" ++ show ("Binary", takeFileName bfp)
-
-      (NarDir afp _, NarFile bfp _) -> compare afp bfp
-
-
+      (NarFile afp _ _, NarFile bfp _ _) -> compare afp bfp
+      (NarFile afp _ _, NarDir bfp _) -> compare afp bfp
+      (NarDir afp _, NarFile bfp _ _) -> compare afp bfp
 
 -- Convert a flat list of GitObject into a nested tree of NarObject.
 gitToNarObjects :: [GitObject] -> [NarObject]
@@ -83,7 +78,7 @@ headMaybe xs =
     (x:_) -> Just x
 
 narFile :: GitObject -> NarObject
-narFile obj = NarFile (takeFileName $ goName obj) (goHash obj)
+narFile obj = NarFile (takeFileName $ goName obj) (goHash obj) ((goPerms obj .&. 1) > 0)
 
 -- Recursively sort the tree to match the 'nix-store' version.
 reorder :: [NarObject] -> [NarObject]

@@ -26,7 +26,10 @@ library
                        Nix.Nar
 
   other-modules:       Nix.Git.Internal
+                       Nix.Nar.Bits
+                       Nix.Nar.Error
                        Nix.Nar.Object
+                       Nix.Nar.Sha
 
   -- other-extensions:
   build-depends:       base                             >= 4.12             && < 5
@@ -35,8 +38,10 @@ library
                      , base32-z-bytestring
                      , bytestring
                      , containers
+                     , cryptonite
                      , directory
                      , filepath
+                     , memory
                      , pretty-show
                      , process-extras
                      , quiet
