@@ -7,7 +7,7 @@ module Nix.Nar.Error
 import           Data.Text (Text)
 import qualified Data.Text as Text
 
-import           Nix.Git
+import           Nix.Nar.Git
 
 data NarStatus
   = NarSuccess FilePath
@@ -20,6 +20,6 @@ renderNarStatus :: NarStatus -> Text
 renderNarStatus ns =
   case ns of
     NarSuccess fp -> mconcat [ "Generated nar file: ", Text.pack fp ]
-    NarNotDir fp -> mconcat [ "Provided fil epath ", Text.pack fp, " is not a directory" ]
+    NarNotDir fp -> mconcat [ "Provided filepath ", Text.pack fp, " is not a directory" ]
     NarGitError ge -> renderGitError ge
     NarReadFail fp err -> mconcat [ "Reading file ", Text.pack fp, " failed: ", Text.pack err ]

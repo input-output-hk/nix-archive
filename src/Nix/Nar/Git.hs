@@ -1,14 +1,17 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Nix.Git
+module Nix.Nar.Git
   ( GitError (..)
   , GitHash (..)
   , GitObject (..)
   , gitAssertDir
+  , gitBinary
   , gitCatFile
+  , gitCheckHash
   , gitHeadHash
-  , gitListHash
+  , gitRepoListAtHash
+  , gitProcess
   , renderGitError
   ) where
 
@@ -16,7 +19,7 @@ import           Control.Applicative ((<*))
 import           Control.Monad (unless)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Except (ExceptT)
-import           Control.Monad.Trans.Except.Extra (hoistEither, left)
+import           Control.Monad.Trans.Except.Extra (hoistEither, left, newExceptT, runExceptT)
 
 import           Data.Attoparsec.ByteString.Char8 (Parser)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
@@ -24,21 +27,14 @@ import           Data.Bifunctor (first)
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Char as Char
-import           Data.Text (Text)
-import qualified Data.Text as Text
 
 import           GHC.Generics (Generic)
 
-import           Nix.Git.Internal
+import           Nix.Nar.Git.Internal
 
 import           Quiet (Quiet (..))
 
-import           System.Directory (doesDirectoryExist)
-
-data GitError
-  = GEGitDirMissing
-  | GEParsError String
-  deriving (Eq, Show)
+import           System.Directory (doesDirectoryExist, withCurrentDirectory)
 
 newtype GitHash
   -- A git hash, but can also be the string "HEAD"
@@ -62,26 +58,28 @@ gitAssertDir = do
 
 gitCatFile :: GitHash -> ExceptT GitError IO ByteString
 gitCatFile (GitHash hash) =
-  liftIO $ gitProcess [ "cat-file", "-p", BS.unpack hash ]
+  gitProcess [ "cat-file", "-p", BS.unpack hash ]
+
+gitCheckHash :: FilePath -> GitHash -> ExceptT GitError IO GitHash
+gitCheckHash dir ghash =
+  if BS.all Char.isHexDigit (unGitHash ghash)
+    then pure ghash
+    else newExceptT .
+           withCurrentDirectory dir $
+             runExceptT gitHeadHash
 
 gitHeadHash :: ExceptT GitError IO GitHash
 gitHeadHash =
   GitHash
     . BS.takeWhile (Char.isHexDigit)
-    <$> liftIO (gitProcess [ "rev-parse", "HEAD" ])
+    <$> gitProcess [ "rev-parse", "HEAD" ]
 
-gitListHash :: GitHash -> ExceptT GitError IO [GitObject]
-gitListHash (GitHash hash) = do
-  bs <- liftIO $ gitProcess [ "ls-tree", "--full-tree", "-r", BS.unpack hash ]
+gitRepoListAtHash :: GitHash -> ExceptT GitError IO [GitObject]
+gitRepoListAtHash (GitHash hash) = do
+  bs <- gitProcess [ "ls-tree", "--full-tree", "-r", BS.unpack hash ]
   -- 'ls-tree' seems to return file objects sorted by their names, and that seems to
   -- be what is needed for nar files.
   hoistEither $ first GEParsError (Atto.parseOnly lsParser bs)
-
-renderGitError :: GitError -> Text
-renderGitError ge =
-  case ge of
-    GEGitDirMissing -> "Provided directory does not contain a .git subdirectory."
-    GEParsError err -> mconcat [ "Git parse error: ", Text.pack err ]
 
 -- -------------------------------------------------------------------------------------------------
 

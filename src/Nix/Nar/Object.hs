@@ -9,7 +9,7 @@ import qualified Data.List as List
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 
-import           Nix.Git
+import           Nix.Nar.Git
 
 import           System.FilePath (dropTrailingPathSeparator, splitPath, takeFileName)
 

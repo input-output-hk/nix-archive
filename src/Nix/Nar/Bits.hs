@@ -11,7 +11,7 @@ import qualified Data.Binary.Put as Binary
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 
-import           Nix.Git
+import           Nix.Nar.Git
 import           Nix.Nar.Error
 import           Nix.Nar.Object
 
@@ -84,6 +84,8 @@ buildBitsNarFile fpath ghash executable = do
       if executable
         then [ narString "executable", narString "" ]
         else []
+
+-- -------------------------------------------------------------------------------------------------
 
 narHeader :: BS.ByteString
 narHeader = "\x0d\x00\x00\x00\x00\x00\x00\x00nix-archive-1\x00\x00\x00"
