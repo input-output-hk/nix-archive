@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Nix.Nar
-  ( archive
+  ( GitHash (..)
+  , NarStatus (..)
+  , archive
   , buildNarBits
   , nixShaFile
   , nixShaGitRepoAtHash
