@@ -54,7 +54,6 @@ gitAssertDir = do
   exists <- liftIO $ doesDirectoryExist ".git"
   unless exists $
     left GEGitDirMissing
-  pure ()
 
 gitCatFile :: GitHash -> ExceptT GitError IO ByteString
 gitCatFile (GitHash hash) =
@@ -71,7 +70,7 @@ gitCheckHash dir ghash =
 gitHeadHash :: ExceptT GitError IO GitHash
 gitHeadHash =
   GitHash
-    . BS.takeWhile (Char.isHexDigit)
+    . BS.takeWhile Char.isHexDigit
     <$> gitProcess [ "rev-parse", "HEAD" ]
 
 gitRepoListAtHash :: GitHash -> ExceptT GitError IO [GitObject]
