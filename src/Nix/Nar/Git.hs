@@ -12,6 +12,7 @@ module Nix.Nar.Git
   , gitHeadHash
   , gitRepoListAtHash
   , gitProcess
+  , isGitBlob
   , renderGitError
   ) where
 
@@ -42,8 +43,14 @@ newtype GitHash
   deriving (Eq, Generic)
   deriving (Read, Show) via (Quiet GitHash)
 
+data GitObjectType
+  = GOTBlob
+  | GOTCommit
+  deriving (Eq, Generic, Read, Show)
+
 data GitObject = GitObject
   { goPerms :: Word
+  , goType :: GitObjectType
   , goHash :: GitHash
   , goName :: FilePath
   } deriving (Eq, Generic)
@@ -80,6 +87,10 @@ gitRepoListAtHash (GitHash hash) = do
   -- be what is needed for nar files.
   hoistEither $ first GEParsError (Atto.parseOnly lsParser bs)
 
+isGitBlob :: GitObject -> Bool
+isGitBlob go =
+  goType go == GOTBlob
+
 -- -------------------------------------------------------------------------------------------------
 
 lsParser :: Parser [GitObject]
@@ -90,8 +101,16 @@ pGitObject :: Parser GitObject
 pGitObject =
   GitObject
     <$> Atto.decimal
-    <*> (pSkipHSpace *> Atto.string "blob" *> pSkipHSpace *> pGitHash)
+    <*> (pSkipHSpace *> pBlobOrCommit)
+    <*> (pSkipHSpace *> pGitHash)
     <*> (pSkipHSpace *> pFilename <* Atto.endOfLine)
+
+pBlobOrCommit :: Parser GitObjectType
+pBlobOrCommit =
+  Atto.choice
+    [ Atto.string "blob" *> pure GOTBlob
+    , Atto.string "commit" *> pure GOTCommit
+    ]
 
 pFilename :: Parser String
 pFilename =
