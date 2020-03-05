@@ -5,6 +5,8 @@ module Nix.Nar.Git
   ( GitError (..)
   , GitHash (..)
   , GitObject (..)
+  , GitObjectType (..)
+  , GitSubModulePath (..)
   , gitAssertDir
   , gitBinary
   , gitCatFile
@@ -55,6 +57,11 @@ data GitObject = GitObject
   , goName :: FilePath
   } deriving (Eq, Generic)
     deriving (Read, Show) via (Quiet GitObject)
+
+newtype GitSubModulePath = GitSubModulePath
+  { unGitSubModulePath :: FilePath
+  } deriving (Eq, Generic)
+    deriving (Read, Show) via (Quiet GitSubModulePath)
 
 gitAssertDir :: ExceptT GitError IO ()
 gitAssertDir = do

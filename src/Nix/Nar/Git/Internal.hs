@@ -13,10 +13,12 @@ import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Trans.Except.Extra (left)
 
 import           Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as BS
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
+import           System.Directory (getCurrentDirectory)
 import           System.Exit (ExitCode (..))
 import qualified System.Process.ByteString as Process
 
@@ -41,10 +43,13 @@ readProcess
     -> [String]                         -- ^ any arguments
     -> ExceptT GitError IO ByteString   -- ^ output
 readProcess cmd args = do
+  -- liftIO $  getCurrentDirectory >>= \ cwd -> print (cwd, cmd : args)
   (code, out, err) <- liftIO $ Process.readProcessWithExitCode cmd args ""
   case code of
     ExitSuccess -> pure $ err <> out
-    ExitFailure _ -> left $ GEProcessError (err <> out)
+    ExitFailure _ -> do
+      cwd <- liftIO getCurrentDirectory
+      left $ GEProcessError (mconcat [BS.pack cwd, ":\n  ", err, "\n  ", out])
 
 renderGitError :: GitError -> Text
 renderGitError ge =

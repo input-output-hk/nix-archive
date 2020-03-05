@@ -5,7 +5,7 @@ module Nix.Nar.Bits
   ) where
 
 import           Control.Monad.Trans.Except (ExceptT)
-import           Control.Monad.Trans.Except.Extra (firstExceptT)
+import           Control.Monad.Trans.Except.Extra (firstExceptT, newExceptT, runExceptT)
 
 import qualified Data.Binary.Put as Binary
 import qualified Data.ByteString.Char8 as BS
@@ -14,6 +14,9 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Nix.Nar.Git
 import           Nix.Nar.Error
 import           Nix.Nar.Object
+
+import           System.Directory (withCurrentDirectory)
+
 
 buildNarBits :: [NarObject] -> ExceptT NarStatus IO LBS.ByteString
 buildNarBits objs = do
@@ -35,6 +38,7 @@ buildBitsNarObject obj =
   case obj of
     NarFile name ghash exe -> buildBitsNarFile name ghash exe
     NarDir name objs -> buildBitsNarDir name objs
+    NarSubModule name ghash -> buildBitsNarSubModule (GitSubModulePath name) ghash
 
 buildBitsNarDir :: String -> [NarObject] -> ExceptT NarStatus IO [BS.ByteString]
 buildBitsNarDir name objs = do
@@ -84,6 +88,14 @@ buildBitsNarFile fpath ghash executable = do
       if executable
         then [ narString "executable", narString "" ]
         else []
+
+buildBitsNarSubModule :: GitSubModulePath -> GitHash -> ExceptT NarStatus IO [BS.ByteString]
+buildBitsNarSubModule (GitSubModulePath smpath) ghash =
+  newExceptT
+    . withCurrentDirectory (".git/modules/" ++ smpath)
+    . runExceptT $ do
+        gobjs <- firstExceptT NarGitError $ gitRepoListAtHash ghash
+        concat <$> mapM buildBitsNarObject (gitToNarObjects gobjs)
 
 -- -------------------------------------------------------------------------------------------------
 

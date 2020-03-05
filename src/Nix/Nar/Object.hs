@@ -22,6 +22,7 @@ import           Text.Show.Pretty (pPrint)
 data NarObject
   = NarDir FilePath [NarObject]
   | NarFile FilePath GitHash Bool
+  | NarSubModule FilePath GitHash
   deriving (Eq, Read, Show)
 
 -- Need a custom Ord instance to get the sort order the same as 'nix-store'.
@@ -31,8 +32,14 @@ instance Ord NarObject where
     case (a, b) of
       (NarDir afp _, NarDir bfp _) -> compare afp bfp
       (NarFile afp _ _, NarFile bfp _ _) -> compare afp bfp
-      (NarFile afp _ _, NarDir bfp _) -> compare afp bfp
+      (NarSubModule afp _, NarSubModule bfp _) -> compare afp bfp
+
       (NarDir afp _, NarFile bfp _ _) -> compare afp bfp
+      (NarDir afp _, NarSubModule bfp _) -> compare afp bfp
+      (NarFile afp _ _, NarDir bfp _) -> compare afp bfp
+      (NarFile afp _ _, NarSubModule bfp _) -> compare afp bfp
+      (NarSubModule afp _, NarDir bfp _) -> compare afp bfp
+      (NarSubModule afp _, NarFile bfp _ _) -> compare afp bfp
 
 -- Convert a flat list of GitObject into a nested tree of NarObject.
 gitToNarObjects :: [GitObject] -> [NarObject]
@@ -78,7 +85,10 @@ headMaybe xs =
     (x:_) -> Just x
 
 narFile :: GitObject -> NarObject
-narFile obj = NarFile (takeFileName $ goName obj) (goHash obj) ((goPerms obj .&. 1) > 0)
+narFile obj =
+  case goType obj of
+    GOTBlob -> NarFile (takeFileName $ goName obj) (goHash obj) ((goPerms obj .&. 1) > 0)
+    GOTCommit -> NarDir (takeFileName $ goName obj) [NarSubModule (goName obj) (goHash obj)]
 
 -- Recursively sort the tree to match the 'nix-store' version.
 reorder :: [NarObject] -> [NarObject]
@@ -90,3 +100,4 @@ reorder =
       case no of
         NarDir fp objs -> NarDir fp (reorder objs)
         NarFile {} -> no
+        NarSubModule {} -> no
