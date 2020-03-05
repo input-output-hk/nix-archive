@@ -2,6 +2,7 @@
 
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid ((<>))
+import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text.IO as Text
 
@@ -29,7 +30,8 @@ main =
 -- -----------------------------------------------------------------------------
 
 data Command
-  = CmdGitNar GitDirectory (Maybe GitHash)
+  = CmdBase16ToNixSha ByteString
+  | CmdGitNar GitDirectory (Maybe GitHash)
   | CmdGitNarSha GitDirectory (Maybe GitHash)
   | CmdNixSha FilePath
 
@@ -49,7 +51,11 @@ pVersion =
 pCommand :: Parser Command
 pCommand =
   Opt.subparser $ mconcat
-    [ Opt.command "git-nar"
+    [ Opt.command "base16-to-nix-sha"
+       ( Opt.info (CmdBase16ToNixSha <$> pBase16Sha)
+       $ Opt.progDesc "Convert a base 15 SHA hash to a Nix SHA hash"
+       )
+    , Opt.command "git-nar"
        ( Opt.info (CmdGitNar <$> pGitDirectory <*> Opt.optional pGitHash)
        $ Opt.progDesc "Create a NAR from a git repo, at the specified git hash"
        )
@@ -62,6 +68,14 @@ pCommand =
        $ Opt.progDesc "Print the Nix SHA256 hash of the specified file."
        )
     ]
+
+pBase16Sha :: Parser ByteString
+pBase16Sha =
+  BS.pack <$>
+    Opt.strOption
+      (  Opt.long "hash"
+      <> Opt.help "The base 16 SHA hash."
+      )
 
 pFilePath :: Parser FilePath
 pFilePath =
@@ -91,6 +105,8 @@ pGitHash =
 runNarCommand :: Command -> IO ()
 runNarCommand cmd =
   case cmd of
+    CmdBase16ToNixSha hash ->
+      BS.putStrLn $ Nar.base16ToNix hash
     CmdGitNar (GitDirectory gitdir) mgh ->
       Text.putStrLn . Nar.renderNarStatus =<< Nar.archive gitdir (fromMaybe (GitHash "HEAD") mgh)
 

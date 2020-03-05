@@ -1,17 +1,19 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Nix.Nar.Base32
   ( Sha256 (..)
+  , base16ToNix
   , encode
   ) where
 
 import           Data.Bits ((.&.), (.|.), unsafeShiftL, unsafeShiftR)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.List as List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Word (Word8)
-
 
 {-
 
@@ -42,6 +44,12 @@ static string printHash32(const Hash & hash)
 
 newtype Sha256
   = Sha256 ByteString
+
+base16ToNix :: ByteString -> ByteString
+base16ToNix bs =
+  case Base16.decode bs of
+    (raw, "") -> encode (Sha256 raw)
+    _otherwise -> mconcat [ "Not able to Base16.decode: '", bs, "'." ]
 
 -- Quick and dirty transliteration of the C++ code.
 -- Sha256 is a 32 byte hash, but for some reason we need to add 20 trailing '\0' bytes

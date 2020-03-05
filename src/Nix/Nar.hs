@@ -3,6 +3,7 @@ module Nix.Nar
   ( GitHash (..)
   , NarStatus (..)
   , archive
+  , base16ToNix
   , buildNarBits
   , nixShaFile
   , nixShaGitRepoAtHash
@@ -17,9 +18,10 @@ import           Control.Monad.Trans.Except.Extra (left, firstExceptT, newExcept
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 
-import           Nix.Nar.Git
+import           Nix.Nar.Base32
 import           Nix.Nar.Bits
 import           Nix.Nar.Error
+import           Nix.Nar.Git
 import           Nix.Nar.Object
 import           Nix.Nar.Sha as X
 
