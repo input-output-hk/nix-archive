@@ -1,5 +1,6 @@
 module Nix.Nar.Object
-  ( NarObject (..)
+  ( NarFileType (..)
+  , NarObject (..)
   , gitToNarObjects
   , printNarObjects
   ) where
@@ -21,8 +22,14 @@ import           Text.Show.Pretty (pPrint)
 -- the file.
 data NarObject
   = NarDir FilePath [NarObject]
-  | NarFile FilePath GitHash Bool
+  | NarFile FilePath GitHash NarFileType
   | NarSubModule FilePath GitHash
+  deriving (Eq, Read, Show)
+
+data NarFileType
+  = NarRegular
+  | NarExecuatble  -- Actually a regular file but also an executable
+  | NarSymlink
   deriving (Eq, Read, Show)
 
 -- Need a custom Ord instance to get the sort order the same as 'nix-store'.
@@ -87,8 +94,15 @@ headMaybe xs =
 narFile :: GitObject -> NarObject
 narFile obj =
   case goType obj of
-    GOTBlob -> NarFile (takeFileName $ goName obj) (goHash obj) ((goPerms obj .&. 1) > 0)
+    GOTBlob -> NarFile (takeFileName $ goName obj) (goHash obj) (gitObjToNarFileType (goPerms obj))
     GOTCommit -> NarDir (takeFileName $ goName obj) [NarSubModule (goName obj) (goHash obj)]
+
+  where
+    gitObjToNarFileType ::  Word -> NarFileType
+    gitObjToNarFileType w
+      | w .&. 1 > 0 = NarExecuatble
+      | w == 120000 = NarSymlink
+      | otherwise = NarRegular
 
 -- Recursively sort the tree to match the 'nix-store' version.
 reorder :: [NarObject] -> [NarObject]

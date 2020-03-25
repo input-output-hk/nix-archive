@@ -36,7 +36,7 @@ buildNarBits objs = do
 buildBitsNarObject :: NarObject -> ExceptT NarStatus IO [BS.ByteString]
 buildBitsNarObject obj =
   case obj of
-    NarFile name ghash exe -> buildBitsNarFile name ghash exe
+    NarFile name ghash nft -> buildBitsNarFile name ghash nft
     NarDir name objs -> buildBitsNarDir name objs
     NarSubModule name ghash -> buildBitsNarSubModule (GitSubModulePath name) ghash
 
@@ -62,8 +62,8 @@ buildBitsNarDir name objs = do
       , nsCloseParen
       ]
 
-buildBitsNarFile :: FilePath -> GitHash -> Bool -> ExceptT NarStatus IO [BS.ByteString]
-buildBitsNarFile fpath ghash executable = do
+buildBitsNarFile :: FilePath -> GitHash -> NarFileType -> ExceptT NarStatus IO [BS.ByteString]
+buildBitsNarFile fpath ghash nft = do
   bs <- firstExceptT NarGitError $ gitCatFile ghash
   pure $
     [ nsEntry
@@ -73,11 +73,11 @@ buildBitsNarFile fpath ghash executable = do
     , nsNode
     , nsOpenParen
     , nsType
-    , narString "regular"
+    , narString (if nft == NarSymlink then "symlink" else "regular")
     ]
     ++ exeMarker
     ++
-    [ narString "contents"
+    [ narString (if nft == NarSymlink then "target" else "contents")
     , narString bs
     , nsCloseParen
     , nsCloseParen
@@ -85,7 +85,7 @@ buildBitsNarFile fpath ghash executable = do
   where
     exeMarker :: [BS.ByteString]
     exeMarker =
-      if executable
+      if nft == NarExecuatble
         then [ narString "executable", narString "" ]
         else []
 
