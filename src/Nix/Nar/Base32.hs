@@ -48,8 +48,8 @@ newtype Sha256
 base16ToNix :: ByteString -> ByteString
 base16ToNix bs =
   case Base16.decode bs of
-    (raw, "") -> encode (Sha256 raw)
-    _otherwise -> mconcat [ "Not able to Base16.decode: '", bs, "'." ]
+    Left _ -> mconcat [ "Not able to Base16.decode: '", bs, "'." ]
+    Right raw -> encode (Sha256 raw)
 
 -- Quick and dirty transliteration of the C++ code.
 -- Sha256 is a 32 byte hash, but for some reason we need to add 20 trailing '\0' bytes
