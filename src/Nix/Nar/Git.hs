@@ -18,7 +18,6 @@ module Nix.Nar.Git
   , renderGitError
   ) where
 
-import           Control.Applicative ((<*))
 import           Control.Monad (unless)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Except (ExceptT)
